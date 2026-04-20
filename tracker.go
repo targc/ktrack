@@ -3,6 +3,7 @@ package ktrack
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"strings"
 	"sync"
 	"time"
@@ -79,6 +80,12 @@ func (t *Tracker) poll(ctx context.Context, fn func(Resource) error) {
 	for _, item := range t.items {
 		gvr, err := t.resolveGVR(ctx, item.APIGroup, item.Kind)
 		if err != nil {
+			slog.Error(
+				"resolve gvr error",
+				"error", err.Error(),
+				"api_group", item.APIGroup,
+				"kind", item.Kind,
+			)
 			continue
 		}
 
@@ -98,8 +105,14 @@ func (t *Tracker) poll(ctx context.Context, fn func(Resource) error) {
 				Limit:         500,
 				Continue:      continueToken,
 			})
+
 			if err != nil {
+				slog.Error("resource list error", "error", err.Error())
 				break
+			}
+
+			if len(result.Items) == 0 {
+				slog.Warn("resource list items is empty")
 			}
 
 			for _, obj := range result.Items {
@@ -117,6 +130,7 @@ func (t *Tracker) poll(ctx context.Context, fn func(Resource) error) {
 			if result.GetContinue() == "" {
 				break
 			}
+
 			continueToken = result.GetContinue()
 		}
 	}
